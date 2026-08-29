@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KudiHer - Set up your business</title>
+  <style>
+    :root{font-family:Inter,system-ui,sans-serif;color:#101828;background:#f8fafc}*{box-sizing:border-box}
+    body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px}.card{width:min(100%,560px);background:#fff;border:1px solid #eaecf0;border-radius:16px;padding:36px;box-shadow:0 20px 45px #10182814}
+    h1{margin:0 0 8px}p{color:#667085;line-height:1.5}.progress{display:flex;gap:8px;margin:28px 0}.step{height:6px;flex:1;border-radius:9px;background:#d0d5dd}.step.active{background:#1570ef}
+    form{display:grid;gap:18px}label{display:grid;gap:8px;font-weight:600;color:#344054}input,select{padding:12px 14px;border:1px solid #d0d5dd;border-radius:8px;font-size:16px}button{border:0;border-radius:8px;padding:13px 16px;background:#1570ef;color:#fff;font-weight:700;font-size:15px;cursor:pointer}.status{display:none;padding:12px;background:#fef3f2;color:#b42318;border-radius:8px}
+  </style>
+</head>
+<body><main class="card">
+  <div class="progress" aria-label="Step 1 of 2"><span class="step active"></span><span class="step"></span></div>
+  <h1>Set up your business</h1><p>Tell us a little about your business to get started.</p>
+  <form id="business-form">
+    <label>Business name<input id="name" required minlength="2" maxlength="120" placeholder="e.g. Ada's Fashion"></label>
+    <label>Industry<input id="industry" required minlength="2" maxlength="80" placeholder="e.g. Retail"></label>
+    <label>Currency<select id="currency"><option value="NGN" selected>NGN - Nigerian naira</option><option value="USD">USD - US dollar</option><option value="GBP">GBP - Pound sterling</option><option value="EUR">EUR - Euro</option><option value="GHS">GHS - Ghanaian cedi</option><option value="KES">KES - Kenyan shilling</option><option value="ZAR">ZAR - South African rand</option><option value="CAD">CAD - Canadian dollar</option><option value="AUD">AUD - Australian dollar</option><option value="INR">INR - Indian rupee</option><option value="JPY">JPY - Japanese yen</option><option value="CNY">CNY - Chinese yuan</option><option value="AED">AED - UAE dirham</option><option value="CHF">CHF - Swiss franc</option><option value="BRL">BRL - Brazilian real</option></select></label>
+    <button type="submit">Continue to products</button>
+  </form><div class="status" id="status" role="alert"></div>
+</main>
+<script>
+  const form=document.getElementById('business-form'),status=document.getElementById('status');
+  const json=async r=>{const d=await r.json();if(!r.ok)throw Error(d.message||'Unable to save business details');return d};
+  const csrf=async()=>json(await fetch('/api/auth/csrf',{credentials:'same-origin'})).then(d=>d.csrfToken);
+  form.addEventListener('submit',async e=>{e.preventDefault();status.style.display='none';try{const token=await csrf();await json(await fetch('/api/business/setup',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','x-csrf-token':token},body:JSON.stringify({name:document.getElementById('name').value.trim(),industry:document.getElementById('industry').value.trim(),currency:document.getElementById('currency').value})}));location.href='/onboarding/products'}catch(error){status.textContent=error.message;status.style.display='block'}});
+</script></body></html>
