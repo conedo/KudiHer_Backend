@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>KudiHer Dashboard</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: Inter, system-ui, sans-serif;
+        background: #eef2ff;
+        color: #111827;
+      }
+      .page {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 32px;
+      }
+      .card {
+        background: #ffffff;
+        border-radius: 24px;
+        padding: 28px;
+        box-shadow: 0 24px 64px rgba(15, 23, 42, 0.08);
+      }
+      .top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 30px;
+      }
+      p {
+        margin: 8px 0 16px;
+        color: #4b5563;
+      }
+      .user-row {
+        display: grid;
+        gap: 16px;
+      }
+      .profile {
+        display: flex;
+        gap: 18px;
+        align-items: center;
+      }
+      .avatar {
+        width: 72px;
+        height: 72px;
+        border-radius: 18px;
+        background: #dbeafe;
+        overflow: hidden;
+      }
+      .avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      .info dt {
+        font-weight: 600;
+        color: #374151;
+      }
+      .info dd {
+        margin: 4px 0 12px;
+        color: #4b5563;
+      }
+      .logout {
+        border: 1px solid #d1d5db;
+        background: white;
+        color: #111827;
+        padding: 12px 16px;
+        border-radius: 12px;
+        cursor: pointer;
+      }
+      .status {
+        margin-top: 16px;
+        padding: 14px 16px;
+        border-radius: 14px;
+        background: #fef3c7;
+        color: #92400e;
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <section class="page">
+      <div class="card">
+        <div class="top">
+          <div>
+            <h1>Welcome to your dashboard</h1>
+            <p>Manage your account and review your profile details.</p>
+          </div>
+          <button class="logout" id="logoutBtn">Logout</button>
+        </div>
+
+        <div class="status" id="status"></div>
+
+        <div class="user-row" id="userInfo"></div>
+      </div>
+    </section>
+
+    <script>
+      const userInfo = document.getElementById('userInfo');
+      const status = document.getElementById('status');
+      const logoutBtn = document.getElementById('logoutBtn');
+
+      const showStatus = (message) => {
+        status.textContent = message;
+        status.style.display = 'block';
+      };
+
+      const fetchCurrentUser = () =>
+        fetch('/api/auth/current', {
+          credentials: 'same-origin'
+        });
+
+      const readJson = async (response) => {
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+          throw new Error('Unable to reach the auth server.');
+        }
+
+        return response.json();
+      };
+
+      const getCsrfToken = async () => {
+        const response = await fetch('/api/auth/csrf', {
+          credentials: 'same-origin'
+        });
+        const data = await readJson(response);
+
+        if (!response.ok) {
+          throw new Error(data.message || 'Unable to prepare secure request');
+        }
+
+        return data.csrfToken;
+      };
+
+      const refreshSession = async () => {
+        const csrfToken = await getCsrfToken();
+
+        return fetch('/api/auth/refresh', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {
+            'x-csrf-token': csrfToken
+          }
+        });
+      };
+
+      const loadUser = async (hasRefreshed = false) => {
+        try {
+          let response = await fetchCurrentUser();
+
+          if (response.status === 401 && !hasRefreshed) {
+            const refreshResponse = await refreshSession();
+            if (refreshResponse.ok) {
+              loadUser(true);
+              return;
+            }
+          }
+
+          const data = await readJson(response);
+
+          if (!response.ok) {
+            window.location.href = '/login';
+            return;
+          }
+
+          const user = data.data;
+          userInfo.innerHTML = `
+            <div class="profile">
+              <div class="avatar">
+                ${user.picture ? `<img src="${user.picture}" alt="Profile" />` : '<span></span>'}
+              </div>
+              <div>
+                <p><strong>${user.name}</strong></p>
+                <p>${user.email}</p>
+              </div>
+            </div>
+            <dl class="info">
+              <dt>Provider</dt>
+              <dd>${user.provider}</dd>
+              <dt>Last login</dt>
+              <dd>${new Date(user.lastLogin).toLocaleString()}</dd>
+            </dl>
+          `;
+        } catch (error) {
+          showStatus('Unable to load profile. Please try again.');
+        }
+      };
+
+      logoutBtn.addEventListener('click', () => {
+        window.location.href = '/api/auth/logout';
+      });
+
+      loadUser();
+    </script>
+  </body>
+</html>

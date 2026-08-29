@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KudiHer - Add products</title>
+  <style>
+    :root{font-family:Inter,system-ui,sans-serif;color:#101828;background:#f8fafc}*{box-sizing:border-box}
+    body{margin:0;min-height:100vh;padding:24px}.card{width:min(100%,980px);margin:auto;background:#fff;border:1px solid #eaecf0;border-radius:16px;padding:36px;box-shadow:0 20px 45px #10182814}
+    h1{margin:0 0 8px}p{color:#667085;line-height:1.5}.progress{display:flex;gap:8px;margin:0 0 28px}.step{height:6px;flex:1;border-radius:9px;background:#1570ef}.row{display:grid;grid-template-columns:1.5fr 1fr repeat(3,1fr) auto;gap:10px;align-items:end;margin-bottom:12px}.field{display:grid;gap:6px;font-size:12px;font-weight:600;color:#344054}input{width:100%;padding:11px;border:1px solid #d0d5dd;border-radius:8px;font-size:15px}.remove{padding:10px;border:1px solid #fda29b;background:#fff;color:#b42318;border-radius:8px;cursor:pointer}.actions{display:flex;justify-content:space-between;gap:12px;margin-top:24px}button{border:0;border-radius:8px;padding:13px 16px;background:#1570ef;color:#fff;font-weight:700;font-size:15px;cursor:pointer}.secondary{background:#eef4ff;color:#175cd3}.status{display:none;margin-top:16px;padding:12px;background:#fef3f2;color:#b42318;border-radius:8px}@media(max-width:760px){.row{grid-template-columns:1fr 1fr}.remove{grid-column:1/-1}.card{padding:24px}}
+  </style>
+</head>
+<body><main class="card">
+  <div class="progress" aria-label="Step 2 of 2"><span class="step"></span><span class="step"></span></div>
+  <h1>Add your products</h1><p>Add one or more products. You can manage the rest from your dashboard later.</p>
+  <form id="products-form"><div id="products"></div><div class="actions"><button type="button" class="secondary" id="add">+ Add another product</button><button type="submit">Finish setup</button></div></form>
+  <div class="status" id="status" role="alert"></div>
+</main>
+<script>
+  const list=document.getElementById('products'),status=document.getElementById('status');
+  const addRow=()=>{const row=document.createElement('div');row.className='row';row.innerHTML='<label class="field">Name<input name="name" required maxlength="120"></label><label class="field">SKU<input name="sku" required maxlength="60"></label><label class="field">Cost price<input name="costPrice" required type="number" min="0" step="0.01"></label><label class="field">Selling price<input name="sellingPrice" required type="number" min="0" step="0.01"></label><label class="field">Opening quantity<input name="openingQuantity" required type="number" min="0" step="1"></label><button type="button" class="remove" aria-label="Remove product">Remove</button>';row.querySelector('.remove').onclick=()=>{if(list.children.length>1)row.remove()};list.append(row)};
+  const json=async r=>{const d=await r.json();if(!r.ok)throw Error(d.message||'Unable to save products');return d};
+  const csrf=async()=>json(await fetch('/api/auth/csrf',{credentials:'same-origin'})).then(d=>d.csrfToken);
+  addRow();document.getElementById('add').onclick=addRow;
+  document.getElementById('products-form').addEventListener('submit',async e=>{e.preventDefault();status.style.display='none';const products=[...list.children].map(row=>Object.fromEntries([...row.querySelectorAll('input')].map(input=>[input.name,input.value])));try{const token=await csrf();const data=await json(await fetch('/api/products',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','x-csrf-token':token},body:JSON.stringify({products})}));location.href=data.redirect||'/dashboard'}catch(error){status.textContent=error.message;status.style.display='block'}});
+</script></body></html>
