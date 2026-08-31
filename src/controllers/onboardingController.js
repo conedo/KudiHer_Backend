@@ -41,6 +41,7 @@ exports.createProducts = async (req, res) => {
     costPrice: Number(product.costPrice),
     sellingPrice: Number(product.sellingPrice),
     openingQuantity: Number(product.openingQuantity),
+    stockQuantity: Number(product.openingQuantity),
     hasNumericValues: ['costPrice', 'sellingPrice', 'openingQuantity'].every(
       (field) => product[field] !== undefined && product[field] !== null && String(product[field]).trim() !== ''
     )
