@@ -12,6 +12,12 @@ const productSchema = new mongoose.Schema(
       required: true,
       min: 0,
       validate: { validator: Number.isInteger, message: 'Opening quantity must be a whole number' }
+    },
+    stockQuantity: {
+      type: Number,
+      required: true,
+      min: 0,
+      validate: { validator: Number.isInteger, message: 'Stock quantity must be a whole number' }
     }
   },
   { timestamps: true }

@@ -25,6 +25,7 @@ const cookieOptions = (maxAge) => ({
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
   sameSite: 'lax',
+  path: '/',
   maxAge
 });
 
@@ -69,6 +70,7 @@ const csrfCookieOptions = () => ({
   httpOnly: false,
   secure: process.env.NODE_ENV === 'production',
   sameSite: 'lax',
+  path: '/',
   maxAge: 60 * 60 * 1000
 });
 

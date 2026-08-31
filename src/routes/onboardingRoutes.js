@@ -4,8 +4,8 @@ const { verifyCsrfToken } = require('../controllers/authController');
 const { setupBusiness, createProducts } = require('../controllers/onboardingController');
 
 const router = express.Router();
-router.use(requireAuth, verifyCsrfToken);
-router.post('/business/setup', setupBusiness);
-router.post('/products', createProducts);
+router.use(requireAuth);
+router.post('/business/setup', verifyCsrfToken, setupBusiness);
+router.post('/products', verifyCsrfToken, createProducts);
 
 module.exports = router;

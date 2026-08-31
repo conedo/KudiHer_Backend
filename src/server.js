@@ -54,6 +54,7 @@ app.use(express.static(path.join(__dirname, 'views')));
 const authRoutes = require('./routes/authRoutes');
 app.use('/api/auth', authRoutes);
 app.use('/api', require('./routes/onboardingRoutes'));
+app.use('/api', require('./routes/transactionRoutes'));
 
 app.get('/api/health', (req, res) => {
   res.status(200).json({ success: true, message: 'KudiHer API is running' });
