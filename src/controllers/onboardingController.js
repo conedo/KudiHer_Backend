@@ -31,35 +31,35 @@ exports.createProducts = async (req, res) => {
     return res.status(400).json({ success: false, message: 'Add at least one product.' });
   }
 
-  const business = await Business.findOne({ owner: req.user._id });
-  if (!business) return res.status(400).json({ success: false, message: 'Complete your business details first.' });
-
-  const normalized = products.map((product) => ({
-    business: business._id,
-    name: text(product.name),
-    sku: text(product.sku).toUpperCase(),
-    costPrice: Number(product.costPrice),
-    sellingPrice: Number(product.sellingPrice),
-    openingQuantity: Number(product.openingQuantity),
-    stockQuantity: Number(product.openingQuantity),
-    hasNumericValues: ['costPrice', 'sellingPrice', 'openingQuantity'].every(
-      (field) => product[field] !== undefined && product[field] !== null && String(product[field]).trim() !== ''
-    )
-  }));
-  const valid = normalized.every((product) =>
-    product.name.length >= 1 && product.name.length <= 120 &&
-    product.sku.length >= 1 && product.sku.length <= 60 &&
-    product.hasNumericValues &&
-    Number.isFinite(product.costPrice) && product.costPrice >= 0 &&
-    Number.isFinite(product.sellingPrice) && product.sellingPrice >= 0 &&
-    Number.isInteger(product.openingQuantity) && product.openingQuantity >= 0
-  );
-  const skus = normalized.map((product) => product.sku);
-  if (!valid || new Set(skus).size !== skus.length) {
-    return res.status(400).json({ success: false, message: 'Check each product and use unique SKUs.' });
-  }
-
   try {
+    const business = await Business.findOne({ owner: req.user._id });
+    if (!business) return res.status(400).json({ success: false, message: 'Complete your business details first.' });
+
+    const normalized = products.map((product) => ({
+      business: business._id,
+      name: text(product.name),
+      sku: text(product.sku).toUpperCase(),
+      costPrice: Number(product.costPrice),
+      sellingPrice: Number(product.sellingPrice),
+      openingQuantity: Number(product.openingQuantity),
+      stockQuantity: Number(product.openingQuantity),
+      hasNumericValues: ['costPrice', 'sellingPrice', 'openingQuantity'].every(
+        (field) => product[field] !== undefined && product[field] !== null && String(product[field]).trim() !== ''
+      )
+    }));
+    const valid = normalized.every((product) =>
+      product.name.length >= 1 && product.name.length <= 120 &&
+      product.sku.length >= 1 && product.sku.length <= 60 &&
+      product.hasNumericValues &&
+      Number.isFinite(product.costPrice) && product.costPrice >= 0 &&
+      Number.isFinite(product.sellingPrice) && product.sellingPrice >= 0 &&
+      Number.isInteger(product.openingQuantity) && product.openingQuantity >= 0
+    );
+    const skus = normalized.map((product) => product.sku);
+    if (!valid || new Set(skus).size !== skus.length) {
+      return res.status(400).json({ success: false, message: 'Check each product and use unique SKUs.' });
+    }
+
     const created = await Product.insertMany(normalized.map(({ hasNumericValues, ...product }) => product), { ordered: true });
     req.user.onboardingComplete = true;
     await req.user.save();

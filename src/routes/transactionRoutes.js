@@ -1,11 +1,21 @@
 const express = require('express');
 const { requireAuth } = require('../middleware/auth');
 const { verifyCsrfToken } = require('../controllers/authController');
-const { listProducts, createSale, createExpense, listSales, listExpenses } = require('../controllers/transactionController');
+const {
+  listProducts,
+  listInventoryStatus,
+  updateProduct,
+  createSale,
+  createExpense,
+  listSales,
+  listExpenses
+} = require('../controllers/transactionController');
 
 const router = express.Router();
 router.use(requireAuth);
 router.get('/products', listProducts);
+router.get('/inventory/status', listInventoryStatus);
+router.patch('/products/:productId', verifyCsrfToken, updateProduct);
 router.get('/sales', listSales);
 router.get('/expenses', listExpenses);
 router.post('/sales', verifyCsrfToken, createSale);
