@@ -22,7 +22,7 @@ connectDB();
 const app = express();
 
 // Middleware
-app.use(cors({ origin: true, credentials: true }));
+app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 app.use(cookieParser());
@@ -51,13 +51,24 @@ app.get('/dashboard', requirePageAuth, requireCompletedOnboarding, (req, res) =>
 // Serve frontend assets and legacy .html URLs.
 app.use(express.static(path.join(__dirname, 'views')));
 
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ success: true, message: 'KudiHer API is running' });
+});
+
 const authRoutes = require('./routes/authRoutes');
 app.use('/api/auth', authRoutes);
 app.use('/api', require('./routes/onboardingRoutes'));
 app.use('/api', require('./routes/transactionRoutes'));
 
-app.get('/api/health', (req, res) => {
-  res.status(200).json({ success: true, message: 'KudiHer API is running' });
+app.use((err, req, res, next) => {
+  console.error('Unhandled request error:', err);
+  if (res.headersSent) return next(err);
+  res.status(err.statusCode || err.status || 500).json({
+    success: false,
+    message: process.env.NODE_ENV === 'production'
+      ? 'Internal server error.'
+      : (err.message || 'Internal server error.')
+  });
 });
 
 const PORT = process.env.PORT || 5000;
