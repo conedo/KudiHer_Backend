@@ -36,16 +36,7 @@
         grid-template-columns: minmax(0, 1fr) minmax(360px, 520px);
       }
 
-      .brand-panel {
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        padding: 48px;
-        background:
-          linear-gradient(rgba(16, 24, 40, 0.5), rgba(16, 24, 40, 0.54)),
-          url("https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&w=1400&q=80") center/cover;
-        color: #ffffff;
-      }
+      
 
       .brand {
         display: inline-flex;
@@ -88,6 +79,9 @@
         display: grid;
         place-items: center;
         padding: 32px;
+        position: fixed;
+        inset: 0;
+        z-index: 1; 
       }
 
       .card {
@@ -252,7 +246,7 @@
 
           <div class="status error" id="status"></div>
           <p class="small">
-            Already have an account? <a href="/login">Log in</a>
+            Already have an account? <a href="/auth/signin">Log in</a>
           </p>
         </div>
       </section>

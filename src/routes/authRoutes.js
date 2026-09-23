@@ -1,7 +1,6 @@
 const express = require('express');
 const passport = require('passport');
 const rateLimit = require('express-rate-limit');
-const MongoStore = require('rate-limit-mongo');
 const router = express.Router();
 const {
   signup,
@@ -21,7 +20,7 @@ const hasGoogleConfig = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOG
 
 const requireGoogleConfig = (req, res, next) => {
   if (!hasGoogleConfig) {
-    return res.redirect('/login?error=oauth_config');
+    return res.redirect('/auth/signin?error=oauth_config');
   }
   next();
 };
@@ -31,21 +30,15 @@ const rateLimitLogin = rateLimit({
   limit: LOGIN_LIMIT_MAX_ATTEMPTS,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
-  store: new MongoStore({
-    uri: process.env.MONGO_URI,
-    collectionName: 'loginRateLimitRecords',
-    expireTimeMs: LOGIN_LIMIT_WINDOW_MS,
-    errorHandler: (error) => console.error('Login rate-limit store error:', error)
-  }),
   message: { success: false, message: 'Too many login attempts. Please try again later.' }
 });
 
 router.get('/csrf', issueCsrfToken);
-router.post('/register', verifyCsrfToken, signup);
-router.post('/signup', verifyCsrfToken, signup);
+router.post('/register', rateLimitLogin, verifyCsrfToken, signup);
+router.post('/signup', rateLimitLogin, verifyCsrfToken, signup);
 router.post('/login', verifyCsrfToken, rateLimitLogin, login);
-router.post('/refresh', verifyCsrfToken, refresh);
-router.post('/logout', verifyCsrfToken, logout);
+router.post('/refresh', rateLimitLogin, verifyCsrfToken, refresh);
+router.post('/logout', rateLimitLogin, verifyCsrfToken, logout);
 router.get('/current', getCurrentUser);
 
 router.get(
@@ -61,7 +54,7 @@ router.get(
   '/google/callback',
   requireGoogleConfig,
   passport.authenticate('google', {
-    failureRedirect: '/login?error=oauth',
+    failureRedirect: '/auth/signin?error=oauth',
     session: false
   }),
   googleCallback

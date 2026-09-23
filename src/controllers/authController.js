@@ -181,7 +181,7 @@ exports.login = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: ACCOUNT_NOT_FOUND_ERROR,
-        redirect: '/register'
+        redirect: '/auth/signup'
       });
     }
 
@@ -212,7 +212,7 @@ exports.googleCallback = async (req, res) => {
     await issueAuthCookies(res, req.user);
     res.redirect(req.user.onboardingComplete ? '/dashboard' : '/onboarding');
   } catch (error) {
-    res.redirect('/login?error=oauth');
+    res.redirect('/auth/signin?error=oauth');
   }
 };
 
@@ -266,7 +266,7 @@ exports.logout = async (req, res) => {
   }
 
   clearAuthCookies(res);
-  res.redirect('/login');
+  res.redirect('/auth/signin');
 };
 
 exports.getCurrentUser = async (req, res) => {
