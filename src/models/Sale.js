@@ -9,6 +9,9 @@ const saleSchema = new mongoose.Schema({
   unitCost: { type: Number, required: true, min: 0 },
   revenue: { type: Number, required: true, min: 0 },
   profit: { type: Number, required: true },
+  notes: { type: String, trim: true, maxlength: 500, default: '' },
+  voided: { type: Boolean, default: false, index: true },
+  voided_at: { type: Date },
   created_at: { type: Date, default: Date.now, index: true }
 });
 

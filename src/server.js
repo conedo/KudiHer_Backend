@@ -2,6 +2,7 @@ const path = require('path');
 const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
+const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
 const passport = require('passport');
 const connectDB = require('./config/db.js');
@@ -20,44 +21,71 @@ require('./config/passport')(passport);
 connectDB();
 
 const app = express();
+const viewsDirectory = path.join(__dirname, 'views');
+const publicDirectory = path.join(__dirname, 'public');
+const allowedFrontendOrigin = process.env.FRONTEND_URL;
 
 // Middleware
-app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
+app.use(helmet({ contentSecurityPolicy: false }));
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || origin === allowedFrontendOrigin) return callback(null, true);
+    return callback(new Error('Origin is not allowed by CORS'));
+  },
+  credentials: true
+}));
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 app.use(cookieParser());
 
 app.use(passport.initialize());
 
-app.get('/', (req, res) => res.redirect('/login'));
-app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'views', 'login.html')));
-app.get('/register', (req, res) => res.sendFile(path.join(__dirname, 'views', 'register.html')));
-app.get('/signup', (req, res) => res.redirect('/register'));
+app.use('/public', express.static(publicDirectory, {
+  maxAge: '7d',
+  immutable: process.env.NODE_ENV === 'production',
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', process.env.NODE_ENV === 'production'
+      ? 'public, max-age=604800, immutable'
+      : 'public, max-age=3600');
+  }
+}));
+
+app.get('/', (req, res) => res.sendFile(path.join(viewsDirectory, 'home.html')));
+app.get('/home', (req, res) => res.sendFile(path.join(viewsDirectory, 'home.html')));
+app.get('/auth/signin', (req, res) => res.sendFile(path.join(viewsDirectory, 'login.html')));
+app.get('/auth/signup', (req, res) => res.sendFile(path.join(viewsDirectory, 'register.html')));
+app.get('/login', (req, res) => res.redirect('/auth/signin'));
+app.get('/register', (req, res) => res.redirect('/auth/signup'));
+app.get('/signup', (req, res) => res.redirect('/auth/signup'));
 app.get('/onboarding', requirePageAuth, (req, res) => {
   res.redirect(req.user.onboardingComplete ? '/dashboard' : '/onboarding/business');
 });
 app.get('/onboarding/business', requirePageAuth, (req, res) => {
   if (req.user.onboardingComplete) return res.redirect('/dashboard');
-  res.sendFile(path.join(__dirname, 'views', 'onboarding-business.html'));
+  res.sendFile(path.join(viewsDirectory, 'onboarding-business.html'));
 });
 app.get('/onboarding/products', requirePageAuth, (req, res) => {
   if (req.user.onboardingComplete) return res.redirect('/dashboard');
-  res.sendFile(path.join(__dirname, 'views', 'onboarding-products.html'));
+  res.sendFile(path.join(viewsDirectory, 'onboarding-products.html'));
 });
 app.get('/dashboard', requirePageAuth, requireCompletedOnboarding, (req, res) =>
-  res.sendFile(path.join(__dirname, 'views', 'dashboard.html'))
+  res.sendFile(path.join(viewsDirectory, 'dashboard.html'))
 );
 
 // Serve frontend assets and legacy .html URLs.
-app.use(express.static(path.join(__dirname, 'views')));
+app.use(express.static(viewsDirectory));
 
+app.get('/health', (req, res) => res.status(200).json({ success: true, status: 'ok' }));
 app.get('/api/health', (req, res) => {
-  res.status(200).json({ success: true, message: 'KudiHer API is running' });
+  res.status(200).json({ success: true, message: 'KudiHer API is running', status: 'ok' });
 });
 
 const authRoutes = require('./routes/authRoutes');
 app.use('/api/auth', authRoutes);
+app.use('/api/home', require('./routes/homeRoutes'));
 app.use('/api', require('./routes/onboardingRoutes'));
+app.use('/api', require('./routes/businessRoutes'));
+app.use('/api', require('./routes/productRoutes'));
 app.use('/api', require('./routes/transactionRoutes'));
 
 app.use((err, req, res, next) => {

@@ -18,6 +18,11 @@ const productSchema = new mongoose.Schema(
       required: true,
       min: 0,
       validate: { validator: Number.isInteger, message: 'Stock quantity must be a whole number' }
+    },
+    is_active: {
+      type: Boolean,
+      default: true,
+      index: true
     }
   },
   { timestamps: true }

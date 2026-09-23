@@ -37,7 +37,7 @@ exports.listProducts = async (req, res) => {
   try {
     const business = await getBusiness(req);
     if (!business) return res.status(400).json({ success: false, message: 'Complete your business details first.' });
-    const products = await Product.find({ business: business._id }).select('name sku costPrice sellingPrice stockQuantity openingQuantity').sort({ name: 1 });
+    const products = await Product.find({ business: business._id, is_active: { $ne: false } }).select('name sku costPrice sellingPrice stockQuantity openingQuantity').sort({ name: 1 });
     res.json({ success: true, data: products });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Unable to load products.' });
@@ -55,7 +55,7 @@ exports.listInventoryStatus = async (req, res) => {
       { $group: { _id: '$product', quantity: { $sum: '$quantity' } } }
     ]);
     const salesByProduct = new Map(sales.map((sale) => [sale._id.toString(), sale.quantity]));
-    const products = await Product.find({ business: business._id })
+    const products = await Product.find({ business: business._id, is_active: { $ne: false } })
       .select('name sku costPrice sellingPrice stockQuantity openingQuantity')
       .sort({ name: 1 })
       .lean();
@@ -119,7 +119,7 @@ exports.updateProduct = async (req, res) => {
     const business = await getBusiness(req);
     if (!business) return res.status(400).json({ success: false, message: 'Complete your business details first.' });
     const product = await Product.findOneAndUpdate(
-      { _id: productId, business: business._id },
+      { _id: productId, business: business._id, is_active: { $ne: false } },
       { $set: updates },
       { new: true, runValidators: true }
     ).select('name sku costPrice sellingPrice stockQuantity openingQuantity');
@@ -143,7 +143,7 @@ exports.createSale = async (req, res) => {
     if (!business) return res.status(400).json({ success: false, message: 'Complete your business details first.' });
     session = await mongoose.startSession();
     session.startTransaction();
-    const product = await Product.findOne({ _id: productId, business: business._id }).session(session);
+    const product = await Product.findOne({ _id: productId, business: business._id, is_active: { $ne: false } }).session(session);
     if (!product) {
       await session.abortTransaction();
       return res.status(404).json({ success: false, message: 'Product not found.' });
@@ -201,6 +201,170 @@ exports.createExpense = async (req, res) => {
     res.status(201).json({ success: true, data: expense });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Unable to record expense.' });
+  }
+};
+
+exports.updateSale = async (req, res) => {
+  const saleId = String(req.params.id || '');
+  const notes = req.body.notes;
+  if (!mongoose.isValidObjectId(saleId) || typeof notes !== 'string' || notes.trim().length > 500) {
+    return res.status(400).json({ success: false, message: 'Enter valid sale notes.' });
+  }
+
+  try {
+    const business = await getBusiness(req);
+    if (!business) return res.status(400).json({ success: false, message: 'Complete your business details first.' });
+    const sale = await Sale.findOneAndUpdate(
+      { _id: saleId, business: business._id },
+      { $set: { notes: notes.trim() } },
+      { new: true, runValidators: true }
+    );
+    if (!sale) return res.status(404).json({ success: false, message: 'Sale not found.' });
+    res.json({ success: true, data: sale });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Unable to update sale.' });
+  }
+};
+
+exports.voidSale = async (req, res) => {
+  const saleId = String(req.params.id || '');
+  if (!mongoose.isValidObjectId(saleId)) {
+    return res.status(400).json({ success: false, message: 'Select a valid sale.' });
+  }
+
+  let session;
+  try {
+    const business = await getBusiness(req);
+    if (!business) return res.status(400).json({ success: false, message: 'Complete your business details first.' });
+    session = await mongoose.startSession();
+    session.startTransaction();
+    const sale = await Sale.findOneAndUpdate(
+      { _id: saleId, business: business._id, voided: { $ne: true } },
+      { $set: { voided: true, voided_at: new Date() } },
+      { new: true, session }
+    );
+    if (!sale) {
+      await session.abortTransaction();
+      return res.status(404).json({ success: false, message: 'Sale not found or already voided.' });
+    }
+    const stockUpdate = await Product.updateOne(
+      { _id: sale.product, business: business._id },
+      { $inc: { stockQuantity: sale.quantity } },
+      { session }
+    );
+    if (stockUpdate.modifiedCount !== 1) throw new Error('Product stock could not be restored.');
+    await session.commitTransaction();
+    res.json({ success: true, data: sale });
+  } catch (error) {
+    if (session?.inTransaction()) await session.abortTransaction().catch(() => {});
+    res.status(500).json({ success: false, message: 'Unable to reverse sale.' });
+  } finally {
+    if (session) await session.endSession();
+  }
+};
+
+exports.updateExpense = async (req, res) => {
+  const expenseId = String(req.params.id || '');
+  const category = String(req.body.category || '').trim();
+  const amount = Number(req.body.amount);
+  const description = String(req.body.description || '').trim();
+  const date = parseDate(req.body.date);
+  if (!mongoose.isValidObjectId(expenseId) || !EXPENSE_CATEGORIES.includes(category) || !Number.isFinite(amount) || amount <= 0 || description.length > 500 || !date) {
+    return res.status(400).json({ success: false, message: 'Enter a valid category, positive amount, description, and date.' });
+  }
+
+  try {
+    const business = await getBusiness(req);
+    if (!business) return res.status(400).json({ success: false, message: 'Complete your business details first.' });
+    const expense = await Expense.findOneAndUpdate(
+      { _id: expenseId, business: business._id },
+      { $set: { category, amount, description, date } },
+      { new: true, runValidators: true }
+    );
+    if (!expense) return res.status(404).json({ success: false, message: 'Expense not found.' });
+    res.json({ success: true, data: expense });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Unable to update expense.' });
+  }
+};
+
+exports.deleteExpense = async (req, res) => {
+  const expenseId = String(req.params.id || '');
+  if (!mongoose.isValidObjectId(expenseId)) {
+    return res.status(400).json({ success: false, message: 'Select a valid expense.' });
+  }
+
+  try {
+    const business = await getBusiness(req);
+    if (!business) return res.status(400).json({ success: false, message: 'Complete your business details first.' });
+    const expense = await Expense.findOneAndDelete({ _id: expenseId, business: business._id });
+    if (!expense) return res.status(404).json({ success: false, message: 'Expense not found.' });
+    res.json({ success: true, data: expense });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Unable to delete expense.' });
+  }
+};
+
+const dashboardDateRange = (req, res) => {
+  const now = new Date();
+  const fromValue = req.query.from;
+  const toValue = req.query.to;
+  const validDate = (value) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
+  const from = fromValue ? validDate(fromValue) ? parseDate(fromValue) : null : new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const to = toValue ? validDate(toValue) ? parseEndDate(toValue) : null : new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+  if ((fromValue && !from) || (toValue && !to) || (from && to && from > to)) {
+    res.status(400).json({ success: false, message: 'Enter a valid from and to date range.' });
+    return null;
+  }
+  return { $gte: from, $lte: to };
+};
+
+exports.getDashboard = async (req, res) => {
+  try {
+    const range = dashboardDateRange(req, res);
+    if (!range) return;
+    const business = await getBusiness(req);
+    if (!business) return res.status(400).json({ success: false, message: 'Complete your business details first.' });
+
+    const [salesSummary, expenseSummary] = await Promise.all([
+      Sale.aggregate([
+        { $match: { business: business._id, voided: { $ne: true }, created_at: range } },
+        {
+          $facet: {
+            totals: [{ $group: { _id: null, total_revenue: { $sum: '$revenue' }, gross_profit: { $sum: '$profit' }, transaction_count: { $sum: 1 } } }],
+            top_products: [
+              { $group: { _id: '$product', product_name: { $first: '$productName' }, quantity: { $sum: '$quantity' }, revenue: { $sum: '$revenue' } } },
+              { $sort: { quantity: -1, revenue: -1 } },
+              { $limit: 5 },
+              { $project: { _id: 0, product_id: '$_id', product_name: 1, quantity: 1, revenue: 1 } }
+            ]
+          }
+        }
+      ]),
+      Expense.aggregate([
+        { $match: { business: business._id, date: range } },
+        { $group: { _id: null, total_expenses: { $sum: '$amount' }, transaction_count: { $sum: 1 } } }
+      ])
+    ]);
+
+    const totals = salesSummary[0]?.totals[0] || {};
+    const expenseTotals = expenseSummary[0] || {};
+    const totalRevenue = totals.total_revenue || 0;
+    const totalExpenses = expenseTotals.total_expenses || 0;
+    const grossProfit = totals.gross_profit || 0;
+    res.json({
+      success: true,
+      data: {
+        total_revenue: totalRevenue,
+        total_expenses: totalExpenses,
+        gross_profit: grossProfit,
+        net_profit: grossProfit - totalExpenses,
+        top_5_products: salesSummary[0]?.top_products || [],
+        transaction_count: (totals.transaction_count || 0) + (expenseTotals.transaction_count || 0)
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Unable to load dashboard summary.' });
   }
 };
 

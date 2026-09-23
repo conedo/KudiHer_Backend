@@ -25,11 +25,11 @@ const requireAuth = async (req, res, next) => {
 const requirePageAuth = async (req, res, next) => {
   try {
     const user = await getUserFromRequest(req);
-    if (!user) return res.redirect('/login');
+    if (!user) return res.redirect('/auth/signin');
     req.user = user;
     next();
   } catch (error) {
-    res.redirect('/login');
+    res.redirect('/auth/signin');
   }
 };
 
